@@ -16,8 +16,8 @@ import java.util.concurrent.Executors;
 @Service
 public class SchedulerService {
 
-    private int requestsPerSecond = 100;
-    private int totalSeconds = 25;
+    private int requestsPerSecond = 10000;
+    private int totalSeconds = 60;
 
     @Value("${microservice.spring.url}")
     private String springMicroserviceUrl;
@@ -27,6 +27,14 @@ public class SchedulerService {
 
     private List<Double> springExecutionTimes = new ArrayList<>();
     private List<Double> vertxExecutionTimes = new ArrayList<>();
+    private long springTotalLatency = 0;
+    private long vertxTotalLatency = 0;
+    private List<Long> springLatencies = new ArrayList<>();
+    private List<Long> vertxLatencies = new ArrayList<>();
+    private long springMinLatency = Long.MAX_VALUE;
+    private long springMaxLatency = Long.MIN_VALUE;
+    private long vertxMinLatency = Long.MAX_VALUE;
+    private long vertxMaxLatency = Long.MIN_VALUE;
 
     @Scheduled(fixedRate = 1000) // Run every 1000 milliseconds (1 second)
     public void performScheduledTask() {
@@ -39,12 +47,28 @@ public class SchedulerService {
 
             for (int i = 0; i < requestsPerSecond; i++) {
                 CompletableFuture.runAsync(() -> {
-                    springExecutionTimes.add(makeHttpRequest(springMicroserviceUrl, "Spring Boot"));
+                    double springExecutionTime = makeHttpRequest(springMicroserviceUrl, "Spring Boot");
+                    long springLatency = calculateLatencyInNano(springMicroserviceUrl);
+                    synchronized (springExecutionTimes) {
+                        springExecutionTimes.add(springExecutionTime);
+                    }
+                    synchronized (springLatencies) {
+                        springLatencies.add(springLatency);
+                    }
+                    updateLatencyStats(springLatency, "Spring Boot");
                     latch.countDown();
                 }, executorService);
 
                 CompletableFuture.runAsync(() -> {
-                    vertxExecutionTimes.add(makeHttpRequest(vertxMicroserviceUrl, "Vert.x"));
+                    double vertxExecutionTime = makeHttpRequest(vertxMicroserviceUrl, "Vert.x");
+                    long vertxLatency = calculateLatencyInNano(vertxMicroserviceUrl);
+                    synchronized (vertxExecutionTimes) {
+                        vertxExecutionTimes.add(vertxExecutionTime);
+                    }
+                    synchronized (vertxLatencies) {
+                        vertxLatencies.add(vertxLatency);
+                    }
+                    updateLatencyStats(vertxLatency, "Vert.x");
                     latch.countDown();
                 }, executorService);
             }
@@ -61,39 +85,76 @@ public class SchedulerService {
             totalSeconds--;
         } else {
             // Print final output after all requests are completed
-            printFinalOutput("Spring Boot", springExecutionTimes);
-            printFinalOutput("Vert.x", vertxExecutionTimes);
+            printFinalOutput("Spring Boot", copyList(springExecutionTimes), springTotalLatency, springMinLatency, springMaxLatency);
+            printFinalOutput("Vert.x", copyList(vertxExecutionTimes), vertxTotalLatency, vertxMinLatency, vertxMaxLatency);
 
-            System.out.println("Scheduler has completed 10 seconds. Stopping...");
+            System.out.println("Scheduler has completed 5 seconds. Stopping...");
             System.exit(0);
         }
     }
 
     private double makeHttpRequest(String url, String microserviceName) {
-        long startTime = System.currentTimeMillis();
+        long startTime = System.nanoTime();
         RestTemplate restTemplate = new RestTemplate();
-        String response = restTemplate.getForObject(url, String.class);
-        long endTime = System.currentTimeMillis();
-        double executionTime = endTime - startTime; // Execution time in milliseconds
+        restTemplate.getForObject(url, String.class);
+        long endTime = System.nanoTime();
+        double executionTime = (endTime - startTime) / 1e9; // Convert to seconds
 
         // Print individual request metrics including execution time
-//        System.out.println(microserviceName + " Microservice URL: " + url);
-//        System.out.println(microserviceName + " Microservice Response: " + response);
-//        System.out.println(microserviceName + " Execution Time: " + executionTime + " milliseconds");
-//        System.out.println("-----------------------");
+        // System.out.println(microserviceName + " Microservice URL: " + url);
+        // System.out.println(microserviceName + " Execution Time: " + executionTime + " seconds");
+        // System.out.println("-----------------------");
 
         return executionTime;
     }
 
-    private void printFinalOutput(String microserviceName, List<Double> executionTimes) {
-        double avgExecutionTime = calculateAverage(executionTimes);
-        DecimalFormat df = new DecimalFormat("#.#########"); // Format with up to 9 decimal places
-        System.out.println("Final Average " + microserviceName + " Execution Time: " + df.format(avgExecutionTime) + " milliseconds");
+    private long calculateLatencyInNano(String url) {
+        long startTime = System.nanoTime();
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.getForObject(url, String.class);
+        long endTime = System.nanoTime();
+        return (endTime - startTime);
+    }
+
+    private void updateLatencyStats(long latency, String microserviceName) {
+        if (microserviceName.equals("Spring Boot")) {
+            springTotalLatency += latency;
+            springMinLatency = Math.min(springMinLatency, latency);
+            springMaxLatency = Math.max(springMaxLatency, latency);
+        } else if (microserviceName.equals("Vert.x")) {
+            vertxTotalLatency += latency;
+            vertxMinLatency = Math.min(vertxMinLatency, latency);
+            vertxMaxLatency = Math.max(vertxMaxLatency, latency);
+        }
+    }
+
+
+    private void printFinalOutput(String microserviceName, List<Double> executionTimes,
+                                  long totalLatency, long minLatency, long maxLatency) {
+        double avgExecutionTime = calculateAverageDouble(executionTimes);
+        DecimalFormat executionTimeFormat = new DecimalFormat("#.#########"); // Format with up to 9 decimal places
+        DecimalFormat latencyFormat = new DecimalFormat("#.######"); // Format with up to 6 decimal places for latency
+
+        // Convert nanoseconds to milliseconds for display
+        double totalLatencyMillis = totalLatency / 1_000_000.0;
+        double minLatencyMillis = minLatency / 1_000_000.0;
+        double maxLatencyMillis = maxLatency / 1_000_000.0;
+
+        System.out.println("Final Average " + microserviceName + " Execution Time: " + executionTimeFormat.format(avgExecutionTime) + " seconds");
+        System.out.println("Total " + microserviceName + " Latency: " + latencyFormat.format(totalLatencyMillis) + " milliseconds");
+        System.out.println("Min " + microserviceName + " Latency: " + latencyFormat.format(minLatencyMillis) + " milliseconds");
+        System.out.println("Max " + microserviceName + " Latency: " + latencyFormat.format(maxLatencyMillis) + " milliseconds");
         System.out.println("-----------------------");
     }
 
-    private double calculateAverage(List<Double> values) {
+    private double calculateAverageDouble(List<Double> values) {
         return values.isEmpty() ? 0.0 :
                 values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+    }
+
+    private List<Double> copyList(List<Double> originalList) {
+        synchronized (originalList) {
+            return new ArrayList<>(originalList);
+        }
     }
 }
