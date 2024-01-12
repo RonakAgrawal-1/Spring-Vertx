@@ -1,22 +1,23 @@
 package com.scheduler.scheduler;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Instant;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
-public class SchedulerService implements ApplicationListener<ContextRefreshedEvent> {
+public class SchedulerService {
 
-    private static final int MAX_EXECUTIONS = 10;
-    private int executionCount = 0;
-    private Instant springStartupTime;
-    private Instant vertxStartupTime;
+    private int requestsPerSecond = 100;
+    private int totalSeconds = 25;
 
     @Value("${microservice.spring.url}")
     private String springMicroserviceUrl;
@@ -24,48 +25,75 @@ public class SchedulerService implements ApplicationListener<ContextRefreshedEve
     @Value("${microservice.vertx.url}")
     private String vertxMicroserviceUrl;
 
-    private final ApplicationContext applicationContext;
-
-    public SchedulerService(ApplicationContext applicationContext) {
-        this.applicationContext = applicationContext;
-    }
-
-    @Override
-    public void onApplicationEvent(ContextRefreshedEvent event) {
-        if (event.getApplicationContext().equals(applicationContext)) {
-            if (springMicroserviceUrl != null && event.getApplicationContext().getParent() == null) {
-                springStartupTime = Instant.now();
-                System.out.println("Spring Boot Application started at: " + springStartupTime);
-            } else if (vertxMicroserviceUrl != null) {
-                vertxStartupTime = Instant.now();
-                System.out.println("Vert.x Application started at: " + vertxStartupTime);
-            }
-        }
-    }
+    private List<Double> springExecutionTimes = new ArrayList<>();
+    private List<Double> vertxExecutionTimes = new ArrayList<>();
 
     @Scheduled(fixedRate = 1000) // Run every 1000 milliseconds (1 second)
     public void performScheduledTask() {
-        if (executionCount < MAX_EXECUTIONS) {
-            System.out.println("Scheduler is running... (Execution " + (executionCount + 1) + ")");
-            makeHttpRequest(springMicroserviceUrl, "Spring Boot");
-            makeHttpRequest(vertxMicroserviceUrl, "Vert.x");
-            executionCount++;
+        if (totalSeconds > 0) {
+            System.out.println("Scheduler is running... (Remaining seconds: " + totalSeconds + ")");
+
+            // Perform Spring Boot and Vert.x requests concurrently
+            ExecutorService executorService = Executors.newFixedThreadPool(2);
+            CountDownLatch latch = new CountDownLatch(2);
+
+            for (int i = 0; i < requestsPerSecond; i++) {
+                CompletableFuture.runAsync(() -> {
+                    springExecutionTimes.add(makeHttpRequest(springMicroserviceUrl, "Spring Boot"));
+                    latch.countDown();
+                }, executorService);
+
+                CompletableFuture.runAsync(() -> {
+                    vertxExecutionTimes.add(makeHttpRequest(vertxMicroserviceUrl, "Vert.x"));
+                    latch.countDown();
+                }, executorService);
+            }
+
+            try {
+                // Wait for all tasks to complete
+                latch.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            executorService.shutdown();
+
+            totalSeconds--;
         } else {
-            System.out.println("Scheduler has completed 10 executions. Stopping...");
+            // Print final output after all requests are completed
+            printFinalOutput("Spring Boot", springExecutionTimes);
+            printFinalOutput("Vert.x", vertxExecutionTimes);
+
+            System.out.println("Scheduler has completed 10 seconds. Stopping...");
             System.exit(0);
         }
     }
 
-    private void makeHttpRequest(String url, String microserviceName) {
+    private double makeHttpRequest(String url, String microserviceName) {
         long startTime = System.currentTimeMillis();
         RestTemplate restTemplate = new RestTemplate();
         String response = restTemplate.getForObject(url, String.class);
         long endTime = System.currentTimeMillis();
-        long executionTime = endTime - startTime;
+        double executionTime = endTime - startTime; // Execution time in milliseconds
 
-        System.out.println(microserviceName + " Microservice URL: " + url);
-        System.out.println(microserviceName + " Microservice Response: " + response);
-        System.out.println(microserviceName + " Execution Time: " + executionTime + " ms");
+        // Print individual request metrics including execution time
+//        System.out.println(microserviceName + " Microservice URL: " + url);
+//        System.out.println(microserviceName + " Microservice Response: " + response);
+//        System.out.println(microserviceName + " Execution Time: " + executionTime + " milliseconds");
+//        System.out.println("-----------------------");
+
+        return executionTime;
+    }
+
+    private void printFinalOutput(String microserviceName, List<Double> executionTimes) {
+        double avgExecutionTime = calculateAverage(executionTimes);
+        DecimalFormat df = new DecimalFormat("#.#########"); // Format with up to 9 decimal places
+        System.out.println("Final Average " + microserviceName + " Execution Time: " + df.format(avgExecutionTime) + " milliseconds");
         System.out.println("-----------------------");
+    }
+
+    private double calculateAverage(List<Double> values) {
+        return values.isEmpty() ? 0.0 :
+                values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
     }
 }
