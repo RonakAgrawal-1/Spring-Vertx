@@ -1,62 +1,53 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
+import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 
-    <groupId>your.group.id</groupId>
-    <artifactId>your-artifact-id</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
+public class PostgresqlConnectionFactoryBuilder {
 
-    <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <vertx.version>3.9.7</vertx.version>
-        <reactor.version>3.4.6</reactor.version>
-        <postgresql.version>42.2.5</postgresql.version>
-    </properties>
+    private String host;
+    private int port;
+    private String username;
+    private String password;
+    private String database;
 
-    <dependencies>
-        <!-- Vert.x dependencies -->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-            <version>${vertx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web</artifactId>
-            <version>${vertx.version}</version>
-        </dependency>
+    private PostgresqlConnectionFactoryBuilder() {}
 
-        <!-- Reactor JDBC dependencies -->
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-core</artifactId>
-            <version>${reactor.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-extra</artifactId>
-            <version>${reactor.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor.addons</groupId>
-            <artifactId>reactor-adapter</artifactId>
-            <version>${reactor.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor.addons</groupId>
-            <artifactId>reactor-extra</artifactId>
-            <version>${reactor.version}</version>
-        </dependency>
+    public static PostgresqlConnectionFactoryBuilder builder() {
+        return new PostgresqlConnectionFactoryBuilder();
+    }
 
-        <!-- PostgreSQL JDBC driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${postgresql.version}</version>
-        </dependency>
-    </dependencies>
+    public PostgresqlConnectionFactoryBuilder host(String host) {
+        this.host = host;
+        return this;
+    }
 
-</project>
+    public PostgresqlConnectionFactoryBuilder port(int port) {
+        this.port = port;
+        return this;
+    }
+
+    public PostgresqlConnectionFactoryBuilder username(String username) {
+        this.username = username;
+        return this;
+    }
+
+    public PostgresqlConnectionFactoryBuilder password(String password) {
+        this.password = password;
+        return this;
+    }
+
+    public PostgresqlConnectionFactoryBuilder database(String database) {
+        this.database = database;
+        return this;
+    }
+
+    public io.r2dbc.spi.ConnectionFactory build() {
+        PostgresqlConnectionConfiguration config = PostgresqlConnectionConfiguration.builder()
+                .host(host)
+                .port(port)
+                .username(username)
+                .password(password)
+                .database(database)
+                .build();
+        return new PostgresqlConnectionFactory(config);
+    }
+}
