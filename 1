@@ -1,0 +1,51 @@
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Vertx;
+import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.jdbc.core.DatabaseClient;
+import reactor.jdbc.core.RowMapper;
+
+import java.util.Map;
+
+public class MainVerticle extends AbstractVerticle {
+
+    private DatabaseClient databaseClient;
+
+    @Override
+    public void start() {
+        // Set up JDBC DatabaseClient
+        databaseClient = DatabaseClient.builder()
+                .connectionFactory(new PostgresqlConnectionFactory())
+                .build();
+
+        // Set up HTTP server and router
+        Router router = Router.router(vertx);
+        router.route().handler(BodyHandler.create());
+        router.get("/api/data").handler(this::handleGetData);
+
+        // Start the HTTP server
+        vertx.createHttpServer()
+                .requestHandler(router)
+                .listen(8080);
+    }
+
+    private void handleGetData(RoutingContext routingContext) {
+        Flux<Map<String, Object>> dataFlux = getDataFromDatabase();
+
+        // Set up the response
+        routingContext.response()
+                .setChunked(true)
+                .putHeader("Content-Type", "application/json")
+                .setStatusCode(200)
+                .end();
+    }
+
+    private Flux<Map<String, Object>> getDataFromDatabase() {
+        return databaseClient.execute("SELECT * FROM your_table")
+                .map((RowMapper<Map<String, Object>>) (row, metadata) -> row.get("your_column_name"))
+                .all();
+    }
+}
