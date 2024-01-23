@@ -18,7 +18,13 @@ public class MainVerticle extends AbstractVerticle {
     public void start() {
         // Set up JDBC DatabaseClient
         databaseClient = DatabaseClient.builder()
-                .connectionFactory(new PostgresqlConnectionFactory())
+                .connectionFactory(PostgresqlConnectionFactoryBuilder.builder()
+                        .host("localhost")
+                        .port(5432)
+                        .username("your_username")
+                        .password("your_password")
+                        .database("your_database")
+                        .build())
                 .build();
 
         // Set up HTTP server and router
@@ -47,5 +53,9 @@ public class MainVerticle extends AbstractVerticle {
         return databaseClient.execute("SELECT * FROM your_table")
                 .map((RowMapper<Map<String, Object>>) (row, metadata) -> row.get("your_column_name"))
                 .all();
+    }
+
+    public static void main(String[] args) {
+        Vertx.vertx().deployVerticle(new MainVerticle());
     }
 }
