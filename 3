@@ -1,0 +1,16 @@
+import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
+import io.r2dbc.postgresql.PostgresqlConnectionFactory;
+
+public class PostgresqlConnectionFactory {
+
+    public static io.r2dbc.spi.ConnectionFactory create() {
+        PostgresqlConnectionConfiguration config = PostgresqlConnectionConfiguration.builder()
+                .host("localhost")
+                .port(5432)
+                .username("your_username")
+                .password("your_password")
+                .database("your_database")
+                .build();
+        return new PostgresqlConnectionFactory(config);
+    }
+}
