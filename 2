@@ -1,3 +1,6 @@
+import io.r2dbc.spi.ConnectionFactoryOptions;
+import io.r2dbc.spi.Option;
+import io.r2dbc.spi.ConnectionFactory;
 import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
 import io.r2dbc.postgresql.PostgresqlConnectionFactory;
 import lombok.AllArgsConstructor;
@@ -15,14 +18,15 @@ public class PostgresqlConnectionFactoryBuilder {
     private final String password;
     private final String database;
 
-    public io.r2dbc.spi.ConnectionFactory build() {
-        PostgresqlConnectionConfiguration config = PostgresqlConnectionConfiguration.builder()
-                .host(host)
-                .port(port)
-                .username(username)
-                .password(password)
-                .database(database)
+    public ConnectionFactory build() {
+        ConnectionFactoryOptions options = ConnectionFactoryOptions.builder()
+                .option(ConnectionFactoryOptions.HOST, host)
+                .option(ConnectionFactoryOptions.PORT, port)
+                .option(ConnectionFactoryOptions.USER, username)
+                .option(ConnectionFactoryOptions.PASSWORD, password)
+                .option(ConnectionFactoryOptions.DATABASE, database)
                 .build();
-        return new PostgresqlConnectionFactory(config);
+
+        return new PostgresqlConnectionFactory(options);
     }
 }
