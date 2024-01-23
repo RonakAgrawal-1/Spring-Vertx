@@ -1,46 +1,21 @@
-import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
-import io.r2dbc.postgresql.PostgresqlConnectionFactory;
+import org.postgresql.r2dbc.PostgresqlConnectionConfiguration;
+import org.postgresql.r2dbc.PostgresqlConnectionFactory;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.RequiredArgsConstructor;
 
+@AllArgsConstructor
+@RequiredArgsConstructor
+@Builder
 public class PostgresqlConnectionFactoryBuilder {
 
-    private String host;
-    private int port;
-    private String username;
-    private String password;
-    private String database;
+    private final String host;
+    private final int port;
+    private final String username;
+    private final String password;
+    private final String database;
 
-    private PostgresqlConnectionFactoryBuilder() {}
-
-    public static PostgresqlConnectionFactoryBuilder builder() {
-        return new PostgresqlConnectionFactoryBuilder();
-    }
-
-    public PostgresqlConnectionFactoryBuilder host(String host) {
-        this.host = host;
-        return this;
-    }
-
-    public PostgresqlConnectionFactoryBuilder port(int port) {
-        this.port = port;
-        return this;
-    }
-
-    public PostgresqlConnectionFactoryBuilder username(String username) {
-        this.username = username;
-        return this;
-    }
-
-    public PostgresqlConnectionFactoryBuilder password(String password) {
-        this.password = password;
-        return this;
-    }
-
-    public PostgresqlConnectionFactoryBuilder database(String database) {
-        this.database = database;
-        return this;
-    }
-
-    public io.r2dbc.spi.ConnectionFactory build() {
+    public org.postgresql.r2dbc.api.PostgresqlConnectionFactory build() {
         PostgresqlConnectionConfiguration config = PostgresqlConnectionConfiguration.builder()
                 .host(host)
                 .port(port)
