@@ -1,32 +1,62 @@
-import io.r2dbc.spi.ConnectionFactoryOptions;
-import io.r2dbc.spi.Option;
-import io.r2dbc.spi.ConnectionFactory;
-import io.r2dbc.postgresql.PostgresqlConnectionConfiguration;
-import io.r2dbc.postgresql.PostgresqlConnectionFactory;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.RequiredArgsConstructor;
+import io.vertx.sqlclient.Row;
 
-@AllArgsConstructor
-@RequiredArgsConstructor
-@Builder
-public class PostgresqlConnectionFactoryBuilder {
+public class YourEntity {
 
-    private final String host;
-    private final int port;
-    private final String username;
-    private final String password;
-    private final String database;
+    private Long id;
+    private String name;
+    private String value;
 
-    public ConnectionFactory build() {
-        ConnectionFactoryOptions options = ConnectionFactoryOptions.builder()
-                .option(ConnectionFactoryOptions.HOST, host)
-                .option(ConnectionFactoryOptions.PORT, port)
-                .option(ConnectionFactoryOptions.USER, username)
-                .option(ConnectionFactoryOptions.PASSWORD, password)
-                .option(ConnectionFactoryOptions.DATABASE, database)
-                .build();
+    public YourEntity() {
+        // Default constructor
+    }
 
-        return new PostgresqlConnectionFactory(options);
+    public YourEntity(Long id, String name, String value) {
+        this.id = id;
+        this.name = name;
+        this.value = value;
+    }
+
+    public static YourEntity fromRow(Row row) {
+        // Convert a Vert.x SQL row to YourEntity
+        return new YourEntity(
+            row.getLong("id"),
+            row.getString("name"),
+            row.getString("value")
+        );
+    }
+
+    // Getters and setters
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public void setValue(String value) {
+        this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return "YourEntity{" +
+            "id=" + id +
+            ", name='" + name + '\'' +
+            ", value='" + value + '\'' +
+            '}';
     }
 }
